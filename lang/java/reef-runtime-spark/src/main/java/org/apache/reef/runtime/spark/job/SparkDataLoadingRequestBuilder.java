@@ -42,6 +42,8 @@ import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 import org.apache.reef.tang.exceptions.BindException;
 import org.apache.reef.tang.formats.ConfigurationModule;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
 import java.util.ArrayList;
@@ -80,7 +82,7 @@ public final class SparkDataLoadingRequestBuilder
   /**
    * The input path of the data to be loaded.
    */
-  private String inputPath;
+  private Dataset<Row> inputDataFrame;
 
   /**
    * Return the current spark session associated with the job.
@@ -179,29 +181,16 @@ public final class SparkDataLoadingRequestBuilder
    * Internally, a distributed dataset with a unique partition is created,
    * and {@link SingleDataCenterEvaluatorToPartitionStrategy} is binded.
    *
-   * @param inputPath
-   *          the input path
+   * @param passedInDataFrame
+   *          the input dataframe pointing to a data file in hdfs
    * @return this
    */
-  public SparkDataLoadingRequestBuilder setInputPath(final String inputPath) {
-    this.inputPath = inputPath;
+  public SparkDataLoadingRequestBuilder setInputPath(final Dataset<Row> passedInDataFrame) {
+    this.inputDataFrame = passedInDataFrame;
     this.singleDataCenterStrategy = true;
     return this;
   }
 
-  /**
-   * Sets the distributed data set.
-   * Internally, a {@link MultiDataCenterEvaluatorToPartitionStrategy} is binded.
-   *
-   * @param distributedDataSet
-   *          the distributed data set
-   * @return this
-   */
-  public SparkDataLoadingRequestBuilder setDistributedDataSet(final DistributedDataSet distributedDataSet) {
-    this.distributedDataSet = distributedDataSet;
-    this.singleDataCenterStrategy = false;
-    return this;
-  }
 
   @Override
   public Configuration build() throws BindException {
@@ -211,32 +200,9 @@ public final class SparkDataLoadingRequestBuilder
 
     // need to create the distributed data set
     if (this.singleDataCenterStrategy) {
-      if (this.inputPath == null) {
+      if (this.inputDataFrame == null) {
         throw new BindException("Should specify an input path.");
       }
-      if (this.distributedDataSet != null && !this.distributedDataSet.isEmpty()) {
-        throw new BindException("You should either call setInputPath or setDistributedDataSet, but not both");
-      }
-      // Create a distributed data set with one partition, the splits defined by
-      // the user if greater than 0 or no splits, and data to be loaded from
-      // anywhere.
-      final DistributedDataSet dds = new DistributedDataSet();
-      dds.addPartition(DistributedDataSetPartition
-          .newBuilder()
-          .setPath(inputPath)
-          .setLocation(Constants.ANY_RACK)
-          .setDesiredSplits(numberOfDesiredSplits > 0 ?
-              numberOfDesiredSplits :
-              Integer.parseInt(NumberOfDesiredSplits.DEFAULT_DESIRED_SPLITS)).build());
-      this.distributedDataSet = dds;
-    } else {
-      if (this.inputPath != null) {
-        throw new BindException("You should either call setInputPath or setDistributedDataSet, but not both");
-      }
-    }
-
-    if (this.distributedDataSet == null || this.distributedDataSet.isEmpty()) {
-      throw new BindException("Distributed Data Set is a required parameter.");
     }
 
     if (this.inputFormatClass == null) {
