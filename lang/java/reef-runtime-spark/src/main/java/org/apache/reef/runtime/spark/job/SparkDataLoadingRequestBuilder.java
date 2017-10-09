@@ -41,7 +41,6 @@ import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 import org.apache.reef.tang.exceptions.BindException;
 import org.apache.reef.tang.formats.ConfigurationModule;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -75,6 +74,11 @@ public final class SparkDataLoadingRequestBuilder
    */
   private DistributedDataSet distributedDataSet;
 
+
+  /**
+   * The input path of the data to be loaded.
+   */
+  private String inputPath;
 
 
 
@@ -188,7 +192,6 @@ public final class SparkDataLoadingRequestBuilder
         throw new BindException("You should either call setInputPath or setDistributedDataSet, but not both");
       }
     }
-
 
 
     if (this.inputFormatClass == null) {

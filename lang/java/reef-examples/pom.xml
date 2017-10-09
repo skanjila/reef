@@ -26,7 +26,7 @@ under the License.
     <parent>
         <groupId>org.apache.reef</groupId>
         <artifactId>reef-project</artifactId>
-        <version>0.16.0-SNAPSHOT</version>
+        <version>0.17.0-SNAPSHOT</version>
         <relativePath>../../..</relativePath>
     </parent>
 
@@ -64,6 +64,11 @@ under the License.
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>reef-runtime-mesos</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>reef-runtime-spark</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

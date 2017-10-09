@@ -17,15 +17,18 @@
  * under the License.
  */
 package org.apache.reef.examples.data.loading;
+
+/**
+ * Client for the data loading spark demo app.
+ */
 import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.reef.annotations.audience.ClientSide;
 import org.apache.reef.client.DriverConfiguration;
 import org.apache.reef.client.DriverLauncher;
 import org.apache.reef.client.LauncherStatus;
 import org.apache.reef.driver.evaluator.EvaluatorRequest;
-import org.apache.reef.runtime.local.client.LocalRuntimeConfiguration;
 import org.apache.reef.runtime.spark.job.SparkDataLoadingRequestBuilder;
-import org.apache.reef.runtime.spark.job.SparkRunner;
+import org.apache.reef.runtime.local.client.LocalRuntimeConfiguration;
 import org.apache.reef.runtime.yarn.client.YarnClientConfiguration;
 import org.apache.reef.tang.Configuration;
 import org.apache.reef.tang.Injector;
@@ -37,17 +40,22 @@ import org.apache.reef.tang.exceptions.BindException;
 import org.apache.reef.tang.exceptions.InjectionException;
 import org.apache.reef.tang.formats.CommandLine;
 import org.apache.reef.util.EnvironmentUtils;
+import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Client for the data loading spark demo app.
+ * Client for the data loading demo app running on spark executors.
  */
 @ClientSide
 public final class DataLoadingREEFOnSpark {
 
   private static final Logger LOG = Logger.getLogger(DataLoadingREEFOnSpark.class.getName());
+
   /**
    * The upper limit on the number of Evaluators that the local resourcemanager will hand out concurrently.
    */
@@ -56,10 +64,15 @@ public final class DataLoadingREEFOnSpark {
   private static final int NUM_SPLITS = 6;
   private static final int NUM_COMPUTE_EVALUATORS = 2;
 
+
+  private String inputPath;
+
+
   public static void main(final String[] args)
       throws InjectionException, BindException, IOException {
 
     final Tang tang = Tang.Factory.getTang();
+
 
     final JavaConfigurationBuilder cb = tang.newConfigurationBuilder();
 
@@ -75,6 +88,8 @@ public final class DataLoadingREEFOnSpark {
 
     final boolean isLocal = injector.getNamedInstance(DataLoadingREEFOnSpark.Local.class);
     final int jobTimeout = injector.getNamedInstance(DataLoadingREEFOnSpark.TimeOut.class) * 60 * 1000;
+
+
     final String inputDir = injector.getNamedInstance(DataLoadingREEFOnSpark.InputDir.class);
 
     final Configuration runtimeConfiguration;
@@ -84,7 +99,7 @@ public final class DataLoadingREEFOnSpark {
           .set(LocalRuntimeConfiguration.MAX_NUMBER_OF_EVALUATORS, MAX_NUMBER_OF_EVALUATORS)
           .build();
     } else {
-      LOG.log(Level.INFO, "Running Data Loading spark demo on YARN");
+      LOG.log(Level.INFO, "Running Data Loading reef on spark demo on YARN");
       runtimeConfiguration = YarnClientConfiguration.CONF.build();
     }
 
@@ -147,3 +162,4 @@ public final class DataLoadingREEFOnSpark {
   private DataLoadingREEFOnSpark() {
   }
 }
+
