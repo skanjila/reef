@@ -17,7 +17,7 @@
  * under the License.
  */
 package org.apache.reef.runtime.spark.job;
-import java.util.Set;
+
 import org.apache.commons.lang.Validate;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.TextInputFormat;
@@ -34,7 +34,6 @@ import org.apache.reef.io.data.loading.impl.DistributedDataSetPartition;
 import org.apache.reef.io.data.loading.impl.InputFormatLoadingService;
 import org.apache.reef.io.data.loading.impl.JobConfExternalConstructor;
 import org.apache.reef.io.data.loading.impl.MultiDataCenterEvaluatorToPartitionStrategy;
-import org.apache.reef.runtime.common.utils.Constants;
 import org.apache.reef.tang.Configuration;
 import org.apache.reef.tang.JavaConfigurationBuilder;
 import org.apache.reef.tang.Tang;
@@ -42,28 +41,32 @@ import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 import org.apache.reef.tang.exceptions.BindException;
 import org.apache.reef.tang.formats.ConfigurationModule;
+import org.apache.spark.HashPartitioner;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.sql.SparkSession;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 /**
- * Builder to create a request to the SparkDataLoadingService.
+ * Builder to create a request to the DataLoadingReefOnSpark.
  */
 public final class SparkDataLoadingRequestBuilder
     implements org.apache.reef.util.Builder<Configuration> {
 
   // constant used in several places.
   private static final int UNINITIALIZED = -1;
-  private int numberOfDesiredSplits = UNINITIALIZED;
   private final List<EvaluatorRequest> computeRequests = new ArrayList<>();
   private final List<EvaluatorRequest> dataRequests = new ArrayList<>();
   private boolean inMemory = false;
   private boolean renewFailedEvaluators = true;
   private ConfigurationModule driverConfigurationModule = null;
   private String inputFormatClass;
-  private SparkSession spark;
+  private SparkSession sparkSession;
+  private JavaRDD<String> lines;
+  private HashPartitioner part;
 
 
   /**
@@ -77,24 +80,8 @@ public final class SparkDataLoadingRequestBuilder
    */
   private DistributedDataSet distributedDataSet;
 
-  /**
-   * The input path of the data to be loaded.
-   */
-  private String inputPath;
 
-  /**
-   * Return the current spark session associated with the job.
-   * @return a handle to the spark session
-   */
-  public SparkSession createSparkSession() {
-    spark = SparkSession.builder().appName("ReefOnSparkApplication").enableHiveSupport().getOrCreate();
-    return spark;
-  }
 
-  public SparkDataLoadingRequestBuilder setNumberOfDesiredSplits(final int numberOfDesiredSplits) {
-    this.numberOfDesiredSplits = numberOfDesiredSplits;
-    return this;
-  }
 
   /**
    * Adds the requests to the compute requests list.
@@ -175,33 +162,19 @@ public final class SparkDataLoadingRequestBuilder
   }
 
   /**
-   * Sets the path of the folder where the data is.
+   * Sets the inptu spark dataframe to the one passed in.
    * Internally, a distributed dataset with a unique partition is created,
    * and {@link SingleDataCenterEvaluatorToPartitionStrategy} is binded.
    *
-   * @param inputPath
-   *          the input path
+   * @param passedInPath
+   *          the input rdd
    * @return this
    */
-  public SparkDataLoadingRequestBuilder setInputPath(final String inputPath) {
-    this.inputPath = inputPath;
+  public SparkDataLoadingRequestBuilder setInputPath(final String passedInPath) {
     this.singleDataCenterStrategy = true;
     return this;
   }
 
-  /**
-   * Sets the distributed data set.
-   * Internally, a {@link MultiDataCenterEvaluatorToPartitionStrategy} is binded.
-   *
-   * @param distributedDataSet
-   *          the distributed data set
-   * @return this
-   */
-  public SparkDataLoadingRequestBuilder setDistributedDataSet(final DistributedDataSet distributedDataSet) {
-    this.distributedDataSet = distributedDataSet;
-    this.singleDataCenterStrategy = false;
-    return this;
-  }
 
   @Override
   public Configuration build() throws BindException {
@@ -211,26 +184,11 @@ public final class SparkDataLoadingRequestBuilder
 
     // need to create the distributed data set
     if (this.singleDataCenterStrategy) {
-      if (this.inputPath == null) {
-        throw new BindException("Should specify an input path.");
+      if (this.inputDataFrame == null) {
+        throw new BindException("Should specify an input spark dataframe.");
       }
-      if (this.distributedDataSet != null && !this.distributedDataSet.isEmpty()) {
-        throw new BindException("You should either call setInputPath or setDistributedDataSet, but not both");
-      }
-      // Create a distributed data set with one partition, the splits defined by
-      // the user if greater than 0 or no splits, and data to be loaded from
-      // anywhere.
-      final DistributedDataSet dds = new DistributedDataSet();
-      dds.addPartition(DistributedDataSetPartition
-          .newBuilder()
-          .setPath(inputPath)
-          .setLocation(Constants.ANY_RACK)
-          .setDesiredSplits(numberOfDesiredSplits > 0 ?
-              numberOfDesiredSplits :
-              Integer.parseInt(NumberOfDesiredSplits.DEFAULT_DESIRED_SPLITS)).build());
-      this.distributedDataSet = dds;
     } else {
-      if (this.inputPath != null) {
+      if (this.inputDataFrame != null) {
         throw new BindException("You should either call setInputPath or setDistributedDataSet, but not both");
       }
     }
@@ -297,7 +255,7 @@ public final class SparkDataLoadingRequestBuilder
   }
 
   /**
-   * Abstract away the desired number of splits.
+   * Set the desired number of splits.
    */
   @NamedParameter(short_name = "num_splits", default_value = NumberOfDesiredSplits.DEFAULT_DESIRED_SPLITS)
   public static final class NumberOfDesiredSplits implements Name<Integer> {
@@ -321,7 +279,7 @@ public final class SparkDataLoadingRequestBuilder
   }
 
   /**
-   * Allows to specify a set of data requests to send to the DataLoader.loading data in memory.
+   * Set whether or not to load data into memory.
    */
   @NamedParameter(default_value = "false")
   public static final class LoadDataIntoMemory implements Name<Boolean> {
