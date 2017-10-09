@@ -73,9 +73,9 @@ public final class DataLoadingREEFOnSpark {
 
     final Injector injector = tang.newInjector(cb.build());
 
-    final boolean isLocal = injector.getNamedInstance(DataLoadingREEF.Local.class);
-    final int jobTimeout = injector.getNamedInstance(DataLoadingREEF.TimeOut.class) * 60 * 1000;
-    final String inputDir = injector.getNamedInstance(DataLoadingREEF.InputDir.class);
+    final boolean isLocal = injector.getNamedInstance(DataLoadingREEFOnSpark.Local.class);
+    final int jobTimeout = injector.getNamedInstance(DataLoadingREEFOnSpark.TimeOut.class) * 60 * 1000;
+    final String inputDir = injector.getNamedInstance(DataLoadingREEFOnSpark.InputDir.class);
 
     final Configuration runtimeConfiguration;
     if (isLocal) {

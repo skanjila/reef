@@ -41,9 +41,6 @@ import org.apache.reef.tang.annotations.Name;
 import org.apache.reef.tang.annotations.NamedParameter;
 import org.apache.reef.tang.exceptions.BindException;
 import org.apache.reef.tang.formats.ConfigurationModule;
-import org.apache.spark.HashPartitioner;
-import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.sql.SparkSession;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -64,9 +61,7 @@ public final class SparkDataLoadingRequestBuilder
   private boolean renewFailedEvaluators = true;
   private ConfigurationModule driverConfigurationModule = null;
   private String inputFormatClass;
-  private SparkSession sparkSession;
-  private JavaRDD<String> lines;
-  private HashPartitioner part;
+  private String inputPath;
 
 
   /**
@@ -167,10 +162,11 @@ public final class SparkDataLoadingRequestBuilder
    * and {@link SingleDataCenterEvaluatorToPartitionStrategy} is binded.
    *
    * @param passedInPath
-   *          the input rdd
+   *          the input path pointing to the dataset
    * @return this
    */
   public SparkDataLoadingRequestBuilder setInputPath(final String passedInPath) {
+    this.inputPath = passedInPath;
     this.singleDataCenterStrategy = true;
     return this;
   }
@@ -184,18 +180,16 @@ public final class SparkDataLoadingRequestBuilder
 
     // need to create the distributed data set
     if (this.singleDataCenterStrategy) {
-      if (this.inputDataFrame == null) {
+      if (this.inputPath == null) {
         throw new BindException("Should specify an input spark dataframe.");
       }
     } else {
-      if (this.inputDataFrame != null) {
+      if (this.inputPath != null) {
         throw new BindException("You should either call setInputPath or setDistributedDataSet, but not both");
       }
     }
 
-    if (this.distributedDataSet == null || this.distributedDataSet.isEmpty()) {
-      throw new BindException("Distributed Data Set is a required parameter.");
-    }
+
 
     if (this.inputFormatClass == null) {
       this.inputFormatClass = TextInputFormat.class.getName();
